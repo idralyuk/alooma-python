@@ -21,6 +21,7 @@ DEFAULT_SETTINGS_EMAIL_NOTIFICATIONS = {
 DEFAULT_ENCODING = 'utf-8'
 
 RESTREAM_QUEUE_TYPE_NAME = "RESTREAM"
+REDSHIFT_TYPE = "REDSHIFT"
 METRICS_LIST = [
     'EVENT_SIZE_AVG',
     'EVENT_SIZE_TOTAL',
@@ -76,8 +77,14 @@ class Alooma(object):
 
             return self.__send_request(func, url, True, **kwargs)
 
-        raise Exception("The rest call to {url} failed: {error_message}".format(
-                url=response.url, error_message=response.reason))
+        raise Exception("The rest call to {url} failed\n"
+                        "failure reason: {failure_reason}"
+                        "{failure_content}"
+                        .format(url=response.url,
+                                failure_reason=response.reason,
+                                failure_content="\nfailure content: " +
+                                                response.content if
+                                                response.content else ""))
 
     def __login(self):
         url = self.rest_url + 'login'
@@ -696,12 +703,23 @@ class Alooma(object):
             nodes = [node for node in nodes if node['id'] == input_id]
         return nodes
 
-    def get_redshift_node(self):
-        return self._get_node_by('name', 'Redshift')
-
-    def set_redshift_config(self, hostname, port, schema_name, database_name,
-                            username, password, skip_validation=False):
-        redshift_node = self.get_redshift_node()
+    def set_output_config(self, hostname, port, schema_name, database_name,
+                          username, password, skip_validation=False,
+                          sink_type=None, output_name=None):
+        """
+        :param hostname: Output hostname
+        :param port: Output port
+        :param schema_name: Output schema
+        :param database_name: Output database name
+        :param username: Output username
+        :param password: Output password
+        :param skip_validation: :type bool. True for skip output configuration
+               validation, False for validate output configurations
+        :param sink_type: Output type. Currently support REDSHIFT, MEMSQL
+        :param output_name: Output name that would displayed in the UI
+        :return: :type JSON. Response's content
+        """
+        output_node = self._get_node_by('category', 'OUTPUT')
         payload = {
             'configuration': {
                 'hostname': hostname,
@@ -710,18 +728,31 @@ class Alooma(object):
                 'databaseName': database_name,
                 'username': username,
                 'password': password,
-                'skipValidation': skip_validation
-                },
+                'skipValidation': skip_validation,
+                'sinkType': sink_type.upper()
+            },
             'category': 'OUTPUT',
-            'id': redshift_node['id'],
-            'name': 'Redshift',
-            'type': 'REDSHIFT',
+            'id': output_node['id'],
+            'name': output_name if output_name is not None else sink_type.title(),
+            'type': sink_type.upper(),
             'deleted': False
         }
-        url = self.rest_url + 'plumbing/nodes/'+redshift_node['id']
+        url = self.rest_url + 'plumbing/nodes/' + output_node['id']
 
         res = self.__send_request(requests.put, url, json=payload)
         return parse_response_to_json(res)
+
+    def get_redshift_node(self):
+        return self._get_node_by('type', REDSHIFT_TYPE)
+
+    def set_redshift_config(self, hostname, port, schema_name, database_name,
+                            username, password, skip_validation=False):
+        return self.set_output_config(hostname=hostname, port=port,
+                                      schema_name=schema_name,
+                                      database_name=database_name,
+                                      username=username, password=password,
+                                      skip_validation=skip_validation,
+                                      sink_type=REDSHIFT_TYPE)
 
     def get_redshift_config(self):
         redshift_node = self.get_redshift_node()
