@@ -183,7 +183,8 @@ class Alooma(object):
         return mapping
 
     def create_s3_input(self, name, key, secret, bucket, prefix='',
-                        load_files='all'):
+                        load_files='all', file_format="json", delimiter=",",
+                        quote_char="", escape_char=""):
         """
         Creates an S3 input using the supplied configurations
         :param name: The designated input name
@@ -195,14 +196,32 @@ class Alooma(object):
         :param load_files: Can be either 'all' or 'new'. If 'new'
         is selected, only files which are created/updated after the
         input was created will be retrieved. Default is 'all'.
+        :param file_format: S3 file format. "json", "delimited", "other".
+        :param delimiter: When choosing file format delimited.
+        Delimiter character (\t for tab)
+        :param quote_char: When choosing file format delimited.
+        File quote character (optional)
+        :param escape_char: When choosing file format delimited.
+        Escape character (optional)
         :return: a requests.model.Response object representing the
         result of the create_input call
         """
-        transform_id = self.get_transform_node_id()
+        formats = ["json", "delimited", "other"]
+        if file_format not in formats:
+            raise ValueError("File format cannot be '{file_format}', it has to "
+                             "be one of those: {formats}"
+                             .format(file_format=file_format,
+                                     formats=", ".join(formats)))
+
+        file_format_config = {"type": file_format}
+        if file_format == "delimited":
+            for key, value in {"delimiter": delimiter,
+                               "quoteChar": quote_char,
+                               "escapeChar": escape_char}.items():
+                if value:
+                    file_format_config[key] = value
 
         post_data = {
-            'source': None,
-            'target': transform_id,
             'name': name,
             'type': 'S3',
             'configuration': {
@@ -211,16 +230,14 @@ class Alooma(object):
                 'awsSecretAccessKey': secret,
                 'filePrefix': prefix,
                 'loadFiles': load_files,
-                'fileFormat': '{"type":"other"}',
+                'fileFormat': json.dumps(file_format_config)
             }
         }
         return self.create_input(input_post_data=post_data)
 
     def create_mixpanel_input(self, mixpanel_api_key, mixpanel_api_secret,
-                              from_date, name, transform_id):
+                              from_date, name, transform_id=None):
         post_data = {
-            "source": None,
-            "target": str(transform_id),
             "name": name,
             "type": "MIXPANEL",
             "configuration": {
@@ -236,7 +253,7 @@ class Alooma(object):
         previous_nodes = [x for x in structure['nodes']
                           if x['name'] == input_post_data['name']]
 
-        url = self.rest_url + 'plumbing/nodes'
+        url = self.rest_url + 'plumbing/inputs'
 
         self.__send_request(requests.post, url, json=input_post_data)
 
