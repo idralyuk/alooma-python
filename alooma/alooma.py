@@ -133,7 +133,7 @@ class Alooma(object):
     def get_mapping_mode(self):
         """
         Returns the default mapping mode currently set in the system.
-        The mapping mode should be one of the values in 
+        The mapping mode should be one of the values in
         alooma.MAPPING_MODES
         """
         url = self.rest_url + 'mapping-mode'
@@ -494,11 +494,13 @@ class Alooma(object):
         return json.loads(res.content)
 
     def get_all_transforms(self):
+        """
+        Returns a map from module name to module code
+        """
         url = self.rest_url + 'transform/functions'
         res = self.__send_request(requests.get, url)
         # from list of CodeSnippets to {moduleName: code} mapping
-        return {item['functionName'] : item['code'] for item in res}
-
+        return {item['functionName']: item['code'] for item in res.json()}
 
     def get_transform(self, module_name='main'):
         url = self.rest_url + 'transform/functions/{}'.format(module_name)
