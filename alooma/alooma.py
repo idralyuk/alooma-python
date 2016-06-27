@@ -754,21 +754,34 @@ class Alooma(object):
 
     def set_output_config(self, hostname, port, schema_name, database_name,
                           username, password, skip_validation=False,
-                          sink_type=None, output_name=None):
+                          sink_type=None, output_name=None, ssh_server=None,
+                          ssh_port=None, ssh_username=None, ssh_password=None):
         """
+        Set Output configuration
         :param hostname: Output hostname
         :param port: Output port
         :param schema_name: Output schema
         :param database_name: Output database name
         :param username: Output username
         :param password: Output password
-        :param skip_validation: :type bool. True for skip output configuration
-               validation, False for validate output configurations
+        :param skip_validation: :type bool: True for skip Output configuration
+                                            validation, False for validate
+                                            Output configurations
         :param sink_type: Output type. Currently support REDSHIFT, MEMSQL
         :param output_name: Output name that would displayed in the UI
-        :return: :type JSON. Response's content
+        :param ssh_server: (Optional) The IP or DNS of your SSH server as seen
+                           from the public internet
+        :param ssh_port: (Optional) The SSH port of the SSH server as seen from
+                         the public internet (default port is 22)
+        :param ssh_username: (Optional) The user name on the SSH server for the
+                             SSH connection (the standard is alooma)
+        :param ssh_password: (Optional) The password that matches the user name
+                             on the SSH server
+        :return: :type dict. Response's content
         """
         output_node = self._get_node_by('category', 'OUTPUT')
+        name = output_name if output_name is not None else sink_type.title()
+
         payload = {
             'configuration': {
                 'hostname': hostname,
@@ -782,10 +795,17 @@ class Alooma(object):
             },
             'category': 'OUTPUT',
             'id': output_node['id'],
-            'name': output_name if output_name is not None else sink_type.title(),
+            'name': name,
             'type': sink_type.upper(),
             'deleted': False
         }
+        ssh_config = self.__get_ssh_config(ssh_server=ssh_server,
+                                           ssh_port=ssh_port,
+                                           ssh_username=ssh_username,
+                                           ssh_password=ssh_password)
+        if ssh_config:
+            payload['configuration']['ssh'] = json.dumps(ssh_config) \
+                if isinstance(ssh_config, dict) else ssh_config
         url = self.rest_url + 'plumbing/nodes/' + output_node['id']
 
         res = self.__send_request(requests.put, url, json=payload)
@@ -795,13 +815,40 @@ class Alooma(object):
         return self._get_node_by('type', REDSHIFT_TYPE)
 
     def set_redshift_config(self, hostname, port, schema_name, database_name,
-                            username, password, skip_validation=False):
+                            username, password, skip_validation=False,
+                            ssh_server=None, ssh_port=None, ssh_username=None,
+                            ssh_password=None):
+        """
+        Set Redshift configuration
+        :param hostname: Redshift hostname
+        :param port: Redshift port
+        :param schema_name: Redshift schema
+        :param database_name: Redshift database name
+        :param username: Redshift username
+        :param password: Redshift password
+        :param skip_validation: :type bool: True for skip Redshift configuration
+                                            validation, False for validate
+                                            Redshift configurations
+        :param ssh_server: (Optional) The IP or DNS of your SSH server as seen
+                           from the public internet
+        :param ssh_port: (Optional) The SSH port of the SSH server as seen from
+                         the public internet (default port is 22)
+        :param ssh_username: (Optional) The user name on the SSH server for the
+                             SSH connection (the standard is alooma)
+        :param ssh_password: (Optional) The password that matches the user name
+                             on the SSH server
+        :return: :type dict. Response's content
+        """
         return self.set_output_config(hostname=hostname, port=port,
                                       schema_name=schema_name,
                                       database_name=database_name,
                                       username=username, password=password,
                                       skip_validation=skip_validation,
-                                      sink_type=REDSHIFT_TYPE)
+                                      sink_type=REDSHIFT_TYPE,
+                                      ssh_server=ssh_server,
+                                      ssh_port=ssh_port,
+                                      ssh_username=ssh_username,
+                                      ssh_password=ssh_password)
 
     def get_redshift_config(self):
         redshift_node = self.get_redshift_node()
@@ -929,6 +976,40 @@ class Alooma(object):
             if node[field] == value:
                 return node
         return None
+
+    @staticmethod
+    def __get_ssh_config(ssh_server, ssh_port,
+                         ssh_username, ssh_password=None):
+        """
+        Get SSH configuration dictionary, for more information:
+        https://www.alooma.com/docs/integration/mysql-replication#/#connect-via-ssh
+        :param ssh_server: IP or hostname of the destination SSH host
+        :param ssh_port: Port of the destination SSH host
+        :param ssh_username: Username of the destination SSH host, if not
+                         provided we use alooma
+        :param ssh_password: Password of the destination SSH host, if not
+                             provided we use alooma public key
+        :return: :type dict: SSH configuration dictionary
+        """
+        ssh_config = {}
+        if ssh_server and ssh_port and ssh_username:
+            ssh_config['server'] = ssh_server
+            ssh_config['port'] = ssh_port
+            ssh_config['username'] = ssh_username
+            if ssh_password:
+                ssh_config['password'] = ssh_password
+
+        return ssh_config
+
+    @staticmethod
+    def get_public_ssh_key():
+        return "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+t5OKwGcUGYRdDAC8ovblV" \
+               "/10AoBfuI/nmkxgRx0J+M3tIdTdxW0Layqb6Xtz8PMsxy1uhM+Rw6cXhU/FQW" \
+               "bOr7MB5hJUqXY5OI4NVtI+cc2diCyYUjgCIb7dBSKoyZecJqp3bQuekuZT/Ow" \
+               "Z40vLc42g6cUV01b5loV9pU9DvRl6zZXHyrE7fssJ90q2lhvuBjltU7g543bU" \
+               "klkYtzwqzYpcynNyrCBSWd85aa/3cVPdiugk7hV4nuUk3mVEX/l4GDIsTkLIR" \
+               "zHUHDwt5aWGzhpwdle9D/fxshCbp5nkcg1arSdTveyM/PdJJEHh65986tgprb" \
+               "I0Lz+geqYmASgF deploy@alooma.io"
 
 
 def response_is_ok(response):
