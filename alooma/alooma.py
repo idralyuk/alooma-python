@@ -58,11 +58,14 @@ class Alooma(object):
                                                    server_prefix)
         self.username = username
         self.password = password
-        self.requests_params = None
         self.cookie = None
-        self.__login()
-        if not self.cookie:
-            raise Exception('Failed to obtain cookie')
+        self.requests_params = {
+            'timeout': 60,
+            'cookies': self.cookie
+        }
+
+        # Make a dummy request just to ensure we can login, if necessary
+        self.get_mapping_mode()
 
     def __send_request(self, func, url, is_recheck=False, **kwargs):
         params = self.requests_params.copy()
@@ -92,10 +95,7 @@ class Alooma(object):
         response = requests.post(url, json=login_data)
         if response.status_code == 200:
             self.cookie = response.cookies
-            self.requests_params = {
-                    'timeout': 60,
-                    'cookies': self.cookie
-            }
+            self.requests_params['cookies'] = self.cookie
         else:
             raise Exception('Failed to login to {} with username: '
                             '{}'.format(self.hostname, self.username))
