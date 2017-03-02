@@ -1,6 +1,5 @@
 import json
 import time
-
 import re
 import requests
 from six.moves import urllib
@@ -197,6 +196,18 @@ class Alooma(object):
         mapping = remove_stats(event_type)
         return mapping
 
+    def get_schemas(self):
+        """
+        Returns a dict representation of the redshift schema,
+        supported only for versions 0.5.15 or uppepr
+
+        :return: A dict representation of the redshift schema
+        """
+        url = self.rest_url + "schemas/"
+
+        res = self.__send_request(requests.get, url)
+        return parse_response_to_json(res)
+
     def create_s3_input(self, name, key, secret, bucket, prefix='',
                         load_files='all', file_format="json", delimiter=",",
                         quote_char="", escape_char="", one_click=True):
@@ -297,6 +308,12 @@ class Alooma(object):
         raise FailedToCreateInputException(
             'Failed to create {type} input'.format(
                 type=input_post_data["type"]))
+
+    def create_schema(self, schema_post_data):
+        url = self.rest_url + "schemas"
+
+        res = self.__send_request(requests.post, url, json=schema_post_data)
+        return res
 
     def get_transform_node_id(self):
         transform_node = self._get_node_by('type', 'TRANSFORMER')
