@@ -774,7 +774,7 @@ class Alooma(object):
         """        
         url = self.rest_url + 'tables'
         if shallow:
-            return get_table_names();
+            return self.get_table_names();
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
 
