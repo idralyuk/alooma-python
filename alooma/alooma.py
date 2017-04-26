@@ -2,6 +2,7 @@ import json
 import time
 import re
 import requests
+import warnings
 from six.moves import urllib
 
 MAPPING_MODES = ['AUTO_MAP', 'STRICT', 'FLEXIBLE']
@@ -61,18 +62,18 @@ DEFAULT_TIMEOUT = 60
 
 MAPPING_TIMEOUT = 300
 
+BASE_URL = 'https://app.alooma.com/'
+
+
 class FailedToCreateInputException(Exception):
     pass
 
 
-class Alooma(object):
-    def __init__(self, hostname, username, password, port=8443,
-                 server_prefix=''):
+class Client(object):
+    def __init__(self, username=None, password=None, account_name='',
+                 base_url=BASE_URL):
+        self.rest_url = '%s%s/rest/' % (base_url, account_name)
 
-        self.hostname = hostname
-        self.rest_url = 'https://%s:%d%s/rest/' % (hostname,
-                                                   port,
-                                                   server_prefix)
         self.username = username
         self.password = password
         self.cookie = None
@@ -80,9 +81,7 @@ class Alooma(object):
             'timeout': DEFAULT_TIMEOUT,
             'cookies': self.cookie
         }
-
-        # Make a dummy request just to ensure we can login, if necessary
-        self.get_mapping_mode()
+        self.account_name = self.__get_account_name()
 
     def __send_request(self, func, url, is_recheck=False, **kwargs):
         params = self.requests_params.copy()
@@ -114,8 +113,13 @@ class Alooma(object):
             self.cookie = response.cookies
             self.requests_params['cookies'] = self.cookie
         else:
-            raise Exception('Failed to login to {} with username: '
-                            '{}'.format(self.hostname, self.username))
+            raise Exception('Failed logging in with user: {}'
+                            .format(self.username))
+
+    def __get_account_name(self):
+        url = self.rest_url + 'repository'
+        res = self.__send_request(requests.get, url)
+        return res.json().get('config_clientName')
 
     def get_config(self):
         """
@@ -324,7 +328,7 @@ class Alooma(object):
             return transform_node['id']
 
         raise Exception('Could not locate transform id for %s' %
-                        self.hostname)
+                        self.account_name)
 
     def remove_input(self, input_id):
         url = "{rest_url}plumbing/nodes/remove/{input_id}".format(
@@ -416,8 +420,8 @@ class Alooma(object):
         :return: new mapping dict with new argument
         """
 
-        field = Alooma.find_field_name(schema, field_path, True)
-        Alooma.set_mapping_for_field(field, column_name, field_type,
+        field = Client.find_field_name(schema, field_path, True)
+        Client.set_mapping_for_field(field, column_name, field_type,
                                      non_null, **type_attributes)
 
     @staticmethod
@@ -463,11 +467,11 @@ class Alooma(object):
         if field:
             if not remaining_path:
                 return field
-            return Alooma.find_field_name(field, remaining_path[0])
+            return Client.find_field_name(field, remaining_path[0])
         elif add_if_missing:
             parent_field = schema
             for field in fields_list:
-                parent_field = Alooma.add_field(parent_field, field)
+                parent_field = Client.add_field(parent_field, field)
             return parent_field
         else:
             # raise this if the field is not found,
@@ -1212,6 +1216,19 @@ class Alooma(object):
                "BjltU7g543bUklkYtzwqzYpcynNyrCBSWd85aa/3cVPdiugk7hV4nuUk3m" \
                "VEX/l4GDIsTkLIRzHUHDwt5aWGzhpwdle9D/fxshCbp5nkcg1arSdTveyM" \
                "/PdJJEHh65986tgprbI0Lz+geqYmASgF deploy@alooma.io"
+
+
+class Alooma(Client):
+    def __init__(self, hostname, username, password, port=8443,
+                 server_prefix=''):
+        warnings.warn('%s class is deprecated, passing relevant arguments '
+                      'to %s class' % (self.__class__.__name__,
+                                       self.__class__.__bases__[0].__name__),
+                      DeprecationWarning, stacklevel=2)
+        base_url = 'https://%s:%d%s' % (hostname, port, server_prefix)
+        super(Alooma, self).__init__(username=username,
+                                     password=password,
+                                     base_url=base_url)
 
 
 def response_is_ok(response):
