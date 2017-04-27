@@ -1104,15 +1104,11 @@ class Client(object):
         self.__send_request(requests.delete, url)
 
     def clean_restream_queue(self):
-        event_types = self.get_event_types()
-        for event_type in event_types:
-            self.discard_event_type(event_type["name"])
+        self.purge_restream_queue()
 
-        self.start_restream()
-        queue_depth = self.get_restream_queue_size()
-        while queue_depth != 0:
-            queue_depth = self.get_restream_queue_size()
-            time.sleep(1)
+    def purge_restream_queue(self):
+        url = self.rest_url + 'plumbing/purge/restream'
+        self.__send_request(requests.delete, url)
 
     def start_restream(self):
         """
