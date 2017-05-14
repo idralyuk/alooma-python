@@ -331,6 +331,12 @@ class Client(object):
                         self.account_name)
 
     def remove_input(self, input_id):
+        """
+        :param input_id: the id for a given input
+
+        for example:
+                This can be found in the url in the input settings
+        """
         url = "{rest_url}plumbing/nodes/remove/{input_id}".format(
             rest_url=self.rest_url, input_id=input_id)
         self.__send_request(requests.post, url)
@@ -344,6 +350,7 @@ class Client(object):
         self.set_transform(transform=transform)
 
     def set_mapping(self, mapping, event_type, timeout=MAPPING_TIMEOUT):
+      
         event_type = urllib.parse.quote(event_type, safe='')
         url = self.rest_url + 'event-types/{event_type}/mapping'.format(
             event_type=event_type)
@@ -351,6 +358,9 @@ class Client(object):
         return res
 
     def discard_event_type(self, event_type):
+        """
+        :param event_type: event name found in the mapper
+        """
         event_type_json = {
             "name": event_type,
             "mapping": {
@@ -688,6 +698,10 @@ class Client(object):
         }
 
     def get_throughput_by_name(self, name):
+        """
+        :param name: the name of each node
+                ie. Inputs, Code Engine, Restream, Mapper, and Output
+        """
         structure = self.get_structure()
         return [x['stats']['throughput'] for x in structure['nodes']
                 if x['name'] == name and not x['deleted']]
@@ -766,19 +780,26 @@ class Client(object):
 
         return res
 
-    def get_table_names(self):
-        url = self.rest_url + 'tables?shallow=true'
+    def get_table_names(self, schema=None):
+        """
+        :param schema - return tables from a specific schema, else use default
+        """
+        schema_string = '/%s' %  schema if schema is not None else ''
+        url = self.rest_url + 'tables%s?shallow=true' % schema_string
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
 
     # TODO standardize the responses (handling of error code etc)
-    def get_tables(self, shallow=False):
+    def get_tables(self, shallow=False, schema=None):
         """
         :param shallow - only return schema and table names
+        :param schema - return tables from a specific schema, else use default
         """        
-        url = self.rest_url + 'tables'
         if shallow:
-            return self.get_table_names();
+            return self.get_table_names(schema);
+
+        schema_string = '/%s' %  schema if schema is not None else ''            
+        url = self.rest_url + 'tables%s' % schema_string
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
 
@@ -1213,6 +1234,40 @@ class Client(object):
                "VEX/l4GDIsTkLIRzHUHDwt5aWGzhpwdle9D/fxshCbp5nkcg1arSdTveyM" \
                "/PdJJEHh65986tgprbI0Lz+geqYmASgF deploy@alooma.io"
 
+    def get_deployment_info(self):
+        """ Return dict with Deployment Info """
+        url = self.rest_url + "deployInfo"
+        res = self.__send_request(requests.get, url)
+
+        return res.json()
+
+    ## CONSOLIDATIONS ##
+    def schedule_query(self, event_type, query, frequency=None, run_at=None):
+        """ Return Requests Response to Create Query
+
+            :param event_type: Alooma Event Type Related to Query (or not)
+            :param query: Desired Query to Schedule
+            :param frequency: Desired hours between query runs
+            :param run_at: Cron like string to run query on
+
+        NOTE: you must select either frequency or run_at
+        """
+        if frequency is None and run_at is None:
+            raise Exception('Must specify either run_at or frequency')
+
+        scheduled_query_url = self.rest_url + 'custom-consolidation'
+        
+        # Prep Data for Consolidation Post
+        data = {
+            "custom_query": query,
+            "event_type": event_type,
+            "frequency": frequency,
+            "run_at": run_at
+        }
+        
+        return self.__send_request(requests.post, 
+                                   scheduled_query_url, 
+                                   json=data)
 
 class Alooma(Client):
     def __init__(self, hostname, username, password, port=8443,
