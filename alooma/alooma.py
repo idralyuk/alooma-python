@@ -316,6 +316,15 @@ class Client(object):
             'Failed to create {type} input'.format(
                 type=input_post_data["type"]))
 
+    def edit_input(self, input_post_data):
+        input_id = input_post_data.get('id')
+        if not input_id:
+            raise Exception('Could not edit input without id')
+
+        url = self.rest_url + ('inputs/%s' % input_id)
+        res = self.__send_request(requests.put, url, json=input_post_data)
+        return res
+
     def create_schema(self, schema_post_data):
         url = self.rest_url + "schemas"
 
