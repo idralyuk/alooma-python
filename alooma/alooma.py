@@ -284,13 +284,17 @@ class Client(object):
         return self.create_input(input_post_data=post_data,
                                  one_click=one_click)
 
-    def create_input(self, input_post_data, one_click=True):
+    def create_input(self, input_post_data, one_click=True, validate=True):
         structure = self.get_structure()
         previous_nodes = [x for x in structure['nodes']
                           if x['name'] == input_post_data['name']]
+        if one_click:
+            input_post_data['configuration']['auto_map'] = "true"
 
-        one_click_str = "" if one_click is False else "?automap=true"
-        url = self.rest_url + ('plumbing/inputs%s' % one_click_str)
+        if not validate:
+            url = self.rest_url + ('inputs%s' % "?validate=false")
+        else:
+            url = self.rest_url + 'plumbing/inputs'
 
         self.__send_request(requests.post, url, json=input_post_data)
 
