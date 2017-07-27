@@ -103,8 +103,8 @@ class Client(object):
                         .format(url=response.url,
                                 failure_reason=response.reason,
                                 failure_content="\nfailure content: " +
-                                                response.content if
-                                response.content else ""))
+                                                response.content.decode()
+                                if response.content.decode() else ""))
 
     def __login(self):
         url = self.rest_url + 'login'
@@ -798,7 +798,7 @@ class Client(object):
         """
         :param schema - return tables from a specific schema, else use default
         """
-        schema_string = '/%s' %  schema if schema is not None else ''
+        schema_string = '/%s' % schema if schema is not None else ''
         url = self.rest_url + 'tables%s?shallow=true' % schema_string
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
@@ -810,9 +810,9 @@ class Client(object):
         :param schema - return tables from a specific schema, else use default
         """        
         if shallow:
-            return self.get_table_names(schema);
+            return self.get_table_names(schema)
 
-        schema_string = '/%s' %  schema if schema is not None else ''            
+        schema_string = '/%s' % schema if schema is not None else ''
         url = self.rest_url + 'tables%s' % schema_string
         res = self.__send_request(requests.get, url)
         return parse_response_to_json(res)
@@ -1282,6 +1282,7 @@ class Client(object):
         return self.__send_request(requests.post, 
                                    scheduled_query_url, 
                                    json=data)
+
 
 class Alooma(Client):
     def __init__(self, hostname, username, password, port=8443,
